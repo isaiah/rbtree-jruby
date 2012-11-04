@@ -2,6 +2,14 @@
 
 require 'rubygems'
 require 'bundler'
+
+include\
+  begin
+    RbConfig
+  rescue NameError
+    Config
+  end
+
 begin
   Bundler.setup(:default, :development)
 rescue Bundler::BundlerError => e
@@ -17,7 +25,7 @@ Jeweler::Tasks.new do |gem|
   gem.name = "rbtree-jruby"
   gem.homepage = "http://github.com/isaiah/rbtree-jruby"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
+  gem.summary = %Q{Red Black tree java extension}
   gem.description = %Q{TODO: longer description of your gem}
   gem.email = "isaiah.peng@vcint.com"
   gem.authors = ["Isaiah Peng"]
@@ -51,3 +59,34 @@ Rake::RDocTask.new do |rdoc|
   rdoc.rdoc_files.include('README*')
   rdoc.rdoc_files.include('lib/**/*.rb')
 end
+
+JAVA_DIR = "java/src/rbtree/ext"
+JAVA_SOURCES = FileList["#{JAVA_DIR}/*.java"]
+JAVA_CLASSES = []
+JAVA_RBTREE_JAR = File.expand_path("lib/rbtree/ext/rbtree.jar")
+
+JRUBY_JAR = File.join(CONFIG['libdir'], 'jruby.jar')
+if File.exists?(JRUBY_JAR)
+  JAVA_SOURCES.each do |src|
+    classpath = (Dir["java/lib/*.jar"] << "java/src" << JRUBY_JAR) * ":"
+    obj = src.sub(/\.java/, '.class')
+    file obj => src do
+      sh "javac", "-classpath", classpath, "-source", "1.6", "-target", "1.6", src
+    end
+    JAVA_CLASSES << obj
+  end
+end
+
+desc "Compile jruby extendsion"
+task :compile => JAVA_CLASSES
+
+file JAVA_RBTREE_JAR => :compile do
+  cd "java/src" do
+    rbtree_classes = FileList["rbtree/ext/*.class"]
+    sh "jar", "cf", File.basename(JAVA_RBTREE_JAR), *rbtree_classes
+    mv File.basename(JAVA_RBTREE_JAR), File.dirname(JAVA_RBTREE_JAR)
+  end
+end
+
+desc "Create ext jar"
+task :jar => JAVA_RBTREE_JAR
