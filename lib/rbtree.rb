@@ -1,1 +1,1 @@
-require 'rbtree/ext/rbtree'
+require 'rbtree/ext/red_black_tree'

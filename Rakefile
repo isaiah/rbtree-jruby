@@ -39,6 +39,8 @@ Rake::TestTask.new(:test) do |test|
   test.pattern = 'test/**/test_*.rb'
   test.verbose = true
 end
+desc "Run all tests"
+task :test => :jar
 
 require 'rcov/rcovtask'
 Rcov::RcovTask.new do |test|
@@ -60,33 +62,31 @@ Rake::RDocTask.new do |rdoc|
   rdoc.rdoc_files.include('lib/**/*.rb')
 end
 
-JAVA_DIR = "java/src/rbtree/ext"
-JAVA_SOURCES = FileList["#{JAVA_DIR}/*.java"]
-JAVA_CLASSES = []
-JAVA_RBTREE_JAR = File.expand_path("lib/rbtree/ext/rbtree.jar")
+require 'ant'
 
-JRUBY_JAR = File.join(CONFIG['libdir'], 'jruby.jar')
-if File.exists?(JRUBY_JAR)
-  JAVA_SOURCES.each do |src|
-    classpath = (Dir["java/lib/*.jar"] << "java/src" << JRUBY_JAR) * ":"
-    obj = src.sub(/\.java/, '.class')
-    file obj => src do
-      sh "javac", "-classpath", classpath, "-source", "1.6", "-target", "1.6", src
-    end
-    JAVA_CLASSES << obj
-  end
+directory "pkg/classes"
+
+desc "Clean up build artifacts"
+task :clean do
+  rm_rf "pkg/classes"
+  rm_rf "lib/rbtree/ext/red_black_tree.jar"
 end
 
-desc "Compile jruby extendsion"
-task :compile => JAVA_CLASSES
-
-file JAVA_RBTREE_JAR => :compile do
-  cd "java/src" do
-    rbtree_classes = FileList["rbtree/ext/*.class"]
-    sh "jar", "cf", File.basename(JAVA_RBTREE_JAR), *rbtree_classes
-    mv File.basename(JAVA_RBTREE_JAR), File.dirname(JAVA_RBTREE_JAR)
-  end
+desc "Compile the extension"
+task :compile => "pkg/classes" do |t|
+  ant.javac :srcdir => "java", :destdir => t.prerequisites.first,
+    :source => "1.5", :target => "1.5", :debug => true,
+    :classpath => "${java.class.path}:${sun.boot.class.path}"
 end
 
-desc "Create ext jar"
-task :jar => JAVA_RBTREE_JAR
+desc "Build the jar"
+task :jar => [:clean, :compile] do
+  ant.jar :basedir => "pkg/classes", :destfile => "lib/rbtree/ext/red_black_tree.jar", :includes => "**/*.class"
+end
+ 
+task :package => :jar
+
+desc "Run the specs"
+task :spec => :jar do
+  ruby "-S", "spec", "spec"
+end
