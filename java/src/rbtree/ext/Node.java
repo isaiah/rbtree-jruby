@@ -7,8 +7,6 @@ public class Node {
     protected Color color;
     protected RubyObject key;
     protected IRubyObject value;
-    protected IRubyObject frozenKey;
-    protected IRubyObject frozenValue;
     protected Node left;
     protected Node right;
     protected Node parent;
@@ -21,7 +19,6 @@ public class Node {
 
     protected Node(IRubyObject key, IRubyObject value, Color color) {
         this.key = (RubyObject) key;
-        this.key.setFrozen(true);
         this.value = value;
         this.color = color;
         this.left = this.right = this.parent = NilNode.getInstance();
@@ -37,14 +34,6 @@ public class Node {
 
     public RubyObject getKey() {
         return this.key;
-    }
-
-    public IRubyObject getFrozenKey() {
-        if (this.frozenKey == null) {
-            this.frozenKey = this.key.dup();
-            this.frozenKey.setFrozen(true);
-        }
-        return this.frozenKey;
     }
 
     public IRubyObject getValue() {
@@ -81,7 +70,6 @@ public class Node {
     }
     public void setKey(IRubyObject key) {
         this.key = (RubyObject) key;
-        this.key.setFrozen(true);
     }
     public void setValue(IRubyObject val) {
         this.value = val;

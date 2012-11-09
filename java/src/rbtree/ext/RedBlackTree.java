@@ -1,13 +1,14 @@
 package rbtree.ext;
 
 import static org.jruby.RubyEnumerator.enumeratorize;
+import static org.jruby.CompatVersion.*;
+
 import org.jruby.Ruby;
 import org.jruby.RubyObject;
 import org.jruby.RubyClass;
 import org.jruby.RubyString;
 import org.jruby.RubyFixnum;
 import org.jruby.RubyHash;
-import org.jruby.RubyHash.Visitor;
 import org.jruby.RubyArray;
 import org.jruby.RubyProc;
 import org.jruby.runtime.Arity;
@@ -22,6 +23,8 @@ import org.jruby.anno.JRubyClass;
 import org.jruby.anno.JRubyMethod;
 import org.jruby.util.TypeConverter;
 import org.jruby.javasupport.util.RuntimeHelpers;
+
+import org.jruby.exceptions.RaiseException;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -96,7 +99,7 @@ public class RedBlackTree extends RubyObject {
                 hash.visitAll(new RubyHash.Visitor() {
                     @Override
                     public void visit(IRubyObject key, IRubyObject val) {
-                        rbtree.insert(context, key, val);
+                        rbtree.internalPut(context, key, val);
                     }
                 });
                 return rbtree;
@@ -115,7 +118,7 @@ public class RedBlackTree extends RubyObject {
                         val = ((RubyArray) v).entry(1);
                     case 1:
                         key = ((RubyArray) v).entry(0);
-                        rbtree.insert(context, key, val);
+                        rbtree.internalPut(context, key, val);
                     }
                 }
                 return rbtree;
@@ -124,27 +127,56 @@ public class RedBlackTree extends RubyObject {
         if (args.length % 2 != 0) throw runtime.newArgumentError("odd number of arguments");
         rbtree = (RedBlackTree) klass.allocate();
         for (int i = 0; i < args.length; i += 2) {
-            rbtree.insert(context, args[i], args[i+1]);
+            rbtree.internalPut(context, args[i], args[i+1]);
         } 
         return rbtree;
     }
 
     @JRubyMethod(name = "[]", required = 1)
     public IRubyObject op_aref(ThreadContext context, IRubyObject key) {
-        Node node = search(context, (RubyObject) key);
+        Node node = internalGet(context, (RubyObject) key);
         return node == null ? callMethod(context, "default", key) : node.getValue();
     }
 
-    @JRubyMethod(name = "[]=", required = 2)
+    @JRubyMethod(name = "[]=", required = 2, compat = RUBY1_8)
     public IRubyObject op_aset(ThreadContext context, IRubyObject key, IRubyObject val) {
-        Node node = search(context, (RubyObject) key); 
-        if (node == null) {
-            checkIterating();
-            this.insert(context, key, val);
-        } else {
-            node.setValue(val);
-        }
+        fastASetCheckString(context, key, val);
         return val;
+    }
+    @JRubyMethod(name = "[]=", required = 2, compat = RUBY1_9)
+    public IRubyObject op_aset19(ThreadContext context, IRubyObject key, IRubyObject val) {
+        fastASetCheckString19(context, key, val);
+        return val;
+    }
+
+    public final void fastASetCheckString(ThreadContext context, IRubyObject key, IRubyObject value) {
+        if (key instanceof RubyString) {
+            op_asetForString(context, (RubyString) key, value);
+        } else {
+            internalPut(context, key, value);
+        }
+    }
+
+    public final void fastASetCheckString19(ThreadContext context, IRubyObject key, IRubyObject value) {
+        if (key.getMetaClass().getRealClass() == context.runtime.getString()) {
+            op_asetForString(context, (RubyString) key, value);
+        } else {
+            internalPut(context, key, value);
+        }
+    }
+
+    protected void op_asetForString(ThreadContext context, RubyString key, IRubyObject value) {
+        Node node = internalGet(context, (RubyObject) key);
+        if (node != null) {
+            node.setValue(value);
+        } else {
+            checkIterating();
+            if (!key.isFrozen()) {
+                key = key.strDup(context.runtime);
+                key.setFrozen(true);
+            }
+            internalPut(context, key, value, false);
+        }
     }
 
     @JRubyMethod(name = "fetch", required = 1, optional = 1)
@@ -152,7 +184,7 @@ public class RedBlackTree extends RubyObject {
         if (block.isGiven() && args.length == 2) {
             getRuntime().getWarnings().warn("block supersedes default value argument");
         }
-        Node node = search(context, (RubyObject) args[0]);
+        Node node = internalGet(context, (RubyObject) args[0]);
         if (node != null)
             return node.getValue();
         if (block.isGiven())
@@ -183,7 +215,7 @@ public class RedBlackTree extends RubyObject {
         Ruby runtime = getRuntime();
         // TODO should allow RubyHash
         if (!(other instanceof RedBlackTree)) {
-            throw runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getClass().getName(), "RedBlackTree"));
+            throw runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "RedBlackTree"));
         }
         RedBlackTree otherTree = (RedBlackTree) other;
         for (Node node = otherTree.minimum(); !node.isNull(); node = otherTree.successor(node)) {
@@ -201,7 +233,7 @@ public class RedBlackTree extends RubyObject {
         Ruby runtime = getRuntime();
         // TODO should allow RubyHash
         if (!(other instanceof RedBlackTree)) {
-            runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getClass().getName(), "RedBlackTree"));
+            runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "RedBlackTree"));
         }
 
         RedBlackTree result = (RedBlackTree) dup();
@@ -214,7 +246,7 @@ public class RedBlackTree extends RubyObject {
 
     @JRubyMethod(name = {"has_key?", "key?", "include?", "member?"})
     public IRubyObject has_key_p(final ThreadContext context, IRubyObject key) {
-        return search(context, (RubyObject) key) == null ? getRuntime().getFalse() : getRuntime().getTrue();
+        return internalGet(context, (RubyObject) key) == null ? getRuntime().getFalse() : getRuntime().getTrue();
     }
 
     private boolean hasValue(final ThreadContext context, final IRubyObject value) {
@@ -278,18 +310,32 @@ public class RedBlackTree extends RubyObject {
 
     @JRubyMethod(name = "readjust", optional = 1)
     public IRubyObject readjust(ThreadContext context, IRubyObject[] args, Block block) {
-        if (block.isGiven()) {
-            this.cmpProc = getRuntime().newProc(Block.Type.PROC, block);
-        }
-        if (args.length == 1) {
-            if (args[0] instanceof RubyProc) {
-                this.cmpProc = (RubyProc) args[0];
+        RubyProc oldProc = this.cmpProc;
+        RedBlackTree self = (RedBlackTree) this.dup();
+        if (args.length == 0) {
+            if (block.isGiven()) {
+                this.cmpProc = getRuntime().newProc(Block.Type.PROC, block);
+            } 
+        } else if (args.length == 1 && !block.isGiven()){
+            if (args[0].isNil()) {
+                this.cmpProc = null;
             } else {
-                throw getRuntime().newTypeError(String.format("wrong argument type %s (expected %s)", args[0].getClass().getName(), "Proc"));
+                if (!(args[0] instanceof RubyProc))
+                    throw getRuntime().newTypeError(String.format("wrong argument type %s, (%s expected)", args[0].getMetaClass().getRealClass().getName(), "Proc"));
+                this.cmpProc = (RubyProc) args[0];
             }
+        } else {
+            raiseArgumeneError();
         }
         if (size == 0) return this;
-        replace(context, this.dup());
+        // if default compare function cannot apply to the keys, restore the tree
+        try {
+            replace(context, self);
+        } catch (RaiseException e) {
+            this.cmpProc = oldProc;
+            replace(context, self);
+            throw e;
+        }
         return this;
     }
 
@@ -326,17 +372,21 @@ public class RedBlackTree extends RubyObject {
         return this.cmpProc;
     }
 
-    @JRubyMethod
-    public IRubyObject add(ThreadContext context, IRubyObject key, IRubyObject value) {
-        return insert(context, key, value);
-    }
-    public RedBlackTree insert(IRubyObject key, IRubyObject value) {
-        return insert(null, key, value);
+    public RedBlackTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value) {
+        return internalPut(context, key, value, true);
     }
 
-    public RedBlackTree insert(ThreadContext context, IRubyObject key, IRubyObject value) {
+    public RedBlackTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value, boolean checkExisting) {
+        if (checkExisting) {
+            Node node = internalGet(context, (RubyObject) key); 
+            if (node != null) {
+                node.setValue(value);
+                return this;
+            }
+        }
+
         Node x = new Node((RubyObject) key, value);
-        insertHelper(context, x);
+        internalPutHelper(context, x);
         while (x != this.root && x.getParent().getColor() == Color.RED){
             if (x.getParent() == x.getParent().getParent().getLeft()) {
                 Node y = x.getParent().getParent().getRight();
@@ -488,17 +538,17 @@ public class RedBlackTree extends RubyObject {
 
     @JRubyMethod
     public IRubyObject shift(ThreadContext context) {
-        return nodeOrDefault(context, minimum());
+        return nodeOrDefault(context, minimum(), true);
     }
 
     @JRubyMethod
     public IRubyObject pop(ThreadContext context) {
-        return nodeOrDefault(context, maximum());
+        return nodeOrDefault(context, maximum(), true);
     }
 
     @JRubyMethod
     public IRubyObject delete(ThreadContext context, IRubyObject key, Block block) {
-        Node node = search(context, (RubyObject) key);
+        Node node = internalGet(context, (RubyObject) key);
         if (node == null) {
             if (block.isGiven()) {
                 return block.yield(context, key);
@@ -556,7 +606,7 @@ public class RedBlackTree extends RubyObject {
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
                 if (block.yieldSpecific(context, key, value).isTrue())
-                    rbtree.add(context, key, value);
+                    rbtree.internalPut(context, key, value);
             }
         });
         return rbtree;
@@ -595,13 +645,17 @@ public class RedBlackTree extends RubyObject {
         final RedBlackTree rbtree = (RedBlackTree) getMetaClass().getRealClass().allocate();
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
-                rbtree.add(context, value, key);
+                rbtree.internalPut(context, value, key);
             }
         });
         return rbtree;
     }
     
     private IRubyObject nodeOrDefault(ThreadContext context, Node node) {
+        return nodeOrDefault(context, node, false);
+    }
+    
+    private IRubyObject nodeOrDefault(ThreadContext context, Node node, boolean deleteNode) {
         if (node.isNull()) {
             if (this.ifNone == null)
                 return getRuntime().getNil();
@@ -609,7 +663,9 @@ public class RedBlackTree extends RubyObject {
                 return RuntimeHelpers.invoke(context, ifNone, "call", this, getRuntime().getNil());
             return ifNone;
         }
-        internalDelete(context, node);
+        if (deleteNode) {
+            internalDelete(context, node);
+        }
         return newArray(node);
     }
 
@@ -627,7 +683,7 @@ public class RedBlackTree extends RubyObject {
         return this;
     }
 
-    public Node search(ThreadContext context, RubyObject key) {
+    public Node internalGet(ThreadContext context, RubyObject key) {
         Node x = this.root;
         while (!x.isNull()) {
             int ret = compare(context, key, x.getKey());
@@ -708,7 +764,7 @@ public class RedBlackTree extends RubyObject {
         return (int) cmpProc.call(context, new IRubyObject[]{a, b}).convertToInteger().getLongValue();
     }
 
-    private void insertHelper(ThreadContext context, Node z) {
+    private void internalPutHelper(ThreadContext context, Node z) {
         Node y = NilNode.getInstance();
         Node x = this.root;
         while(!x.isNull()) {
@@ -800,44 +856,60 @@ public class RedBlackTree extends RubyObject {
 
     @JRubyMethod
     public IRubyObject last(ThreadContext context) {
-        Node node = maximum();
-        return nodeOrDefault(context, node);
+        return nodeOrDefault(context, maximum());
     }
 
     @JRubyMethod
     public IRubyObject first(ThreadContext context) {
-        Node node = minimum();
-        return nodeOrDefault(context, node);
+        return nodeOrDefault(context, minimum());
+    }
+
+    public Node lower_boundInternal(ThreadContext context, IRubyObject key) {
+        Ruby runtime = getRuntime();
+        Node node = this.root;
+        Node tentative = NilNode.getInstance();
+        while (!node.isNull()) {
+            int result = compare(context, (RubyObject) key, node.getKey());
+            if (result > 0) {
+                node = node.getRight();
+            } else if (result < 0) {
+                tentative = node;
+                node = node.getLeft();
+            } else {
+                return node;
+            }
+        }
+        return tentative;
     }
 
     @JRubyMethod
     public IRubyObject lower_bound(ThreadContext context, IRubyObject key) {
+        Node node = lower_boundInternal(context, key);
+        return node.isNull() ? context.runtime.getNil() : newArray(node);
+    }
+
+    public Node upper_boundInternal(ThreadContext context, IRubyObject key) {
         Ruby runtime = getRuntime();
         Node node = this.root;
+        Node tentative = NilNode.getInstance();
         while (!node.isNull()) {
-            int result = ((RubyObject) key).compareTo(node.getKey());
-            if (result > 0) {
+            int result = compare(context, (RubyObject) key, node.getKey());
+            if (result < 0) {
+                node = node.getLeft();
+            } else if (result > 0) {
+                tentative = node;
                 node = node.getRight();
-            } else if (result <= 0) {
-                return newArray(node);
+            } else {
+                return node;
             }
         }
-        return runtime.getNil();
+        return tentative;
     }
     
     @JRubyMethod
     public IRubyObject upper_bound(ThreadContext context, IRubyObject key) {
-        Ruby runtime = getRuntime();
-        Node node = this.root;
-        while (!node.isNull()) {
-            int result = ((RubyObject) key).compareTo(node.getKey());
-            if (result < 0) {
-                node = node.getRight();
-            } else if (result >= 0) {
-                return newArray(node);
-            }
-        }
-        return runtime.getNil();
+        Node node = upper_boundInternal(context, key);
+        return node.isNull() ? context.runtime.getNil() : newArray(node);
     }
 
     @JRubyMethod(name = "bound", required = 1, optional = 1)
@@ -862,13 +934,13 @@ public class RedBlackTree extends RubyObject {
     }
 
     private RubyArray newArray(Node node) {
-        return getRuntime().newArray(node.getFrozenKey(), node.getValue());
+        return getRuntime().newArray(node.getKey(), node.getValue());
     }
 
     @JRubyMethod(name = {"replace", "initialize_copy"})
     public IRubyObject replace(final ThreadContext context, IRubyObject other) {
         if (!(other instanceof RedBlackTree))
-            throw getRuntime().newTypeError(String.format("wrong argument type %s, (%s expected)", other.getClass().getName(), "RedBlackTree"));
+            throw getRuntime().newTypeError(String.format("wrong argument type %s, (%s expected)", other.getMetaClass().getRealClass().getName(), "RedBlackTree"));
         init();
         RedBlackTree otherTree = (RedBlackTree) other;
         if (this == otherTree) return this;
@@ -877,7 +949,7 @@ public class RedBlackTree extends RubyObject {
         this.cmpProc = otherTree.cmpProc;
         otherTree.visitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
-                insert(context, key, value);
+                internalPut(context, key, value);
             }
         });
         return this;
@@ -993,7 +1065,7 @@ public class RedBlackTree extends RubyObject {
 
     private void visitAll(Visitor visitor) {
         for (Node x = minimum(); !x.isNull(); x = successor(x)) {
-            visitor.visit(x.getFrozenKey(), x.getValue());
+            visitor.visit(x.getKey(), x.getValue());
         }
     }
 
@@ -1001,7 +1073,7 @@ public class RedBlackTree extends RubyObject {
         try {
             iteratorEntry();
             for (Node x = maximum(); !x.isNull(); x = predecessor(x)) {
-                visitor.visit(x.getFrozenKey(), x.getValue());
+                visitor.visit(x.getKey(), x.getValue());
             }
         } finally {
             iteratorExit();
@@ -1012,7 +1084,7 @@ public class RedBlackTree extends RubyObject {
         try {
             iteratorEntry();
             for (Node x = minimum(); !x.isNull(); x = successor(x)) {
-                visitor.visit(x.getFrozenKey(), x.getValue());
+                visitor.visit(x.getKey(), x.getValue());
             }
         } finally {
             iteratorExit();
@@ -1054,7 +1126,7 @@ public class RedBlackTree extends RubyObject {
             input.registerLinkTarget(result);
             int size = input.unmarshalInt();
             for (int i = 0; i < size; i++) {
-                result.insert(input.unmarshalObject(), input.unmarshalObject());
+                result.internalPut(runtime.getCurrentContext(), input.unmarshalObject(), input.unmarshalObject());
             }
             //if (defaultValue) result.default_value_set(input.unmarshalObject());
             return result;
