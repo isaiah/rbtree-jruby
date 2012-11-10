@@ -29,9 +29,11 @@ import org.jruby.exceptions.RaiseException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-@JRubyClass(name = "RedBlackTree")
-public class RedBlackTree extends RubyObject {
+@JRubyClass(name = "MultiRBTree")
+public class MultiRBTree extends RubyObject {
     private Node root = NilNode.getInstance();
     private int size = 0;
     private static final int PROCDEFAULT_HASH_F = 1 << 10;
@@ -40,24 +42,25 @@ public class RedBlackTree extends RubyObject {
     private RubyProc cmpProc;
     private boolean dupes;
 
-    public static RubyClass createRedBlackTreeClass(Ruby runtime) {
-        RubyClass rbtreeClass = runtime.defineClass("RedBlackTree", runtime.getObject(), RBTREE_ALLOCATOR);
-        rbtreeClass.setReifiedClass(RedBlackTree.class);
+    public static RubyClass createMultiRBTreeClass(Ruby runtime) {
+        RubyClass rbtreeClass = runtime.defineClass("MultiRBTree", runtime.getObject(), RBTREE_ALLOCATOR);
+        rbtreeClass.setReifiedClass(MultiRBTree.class);
         rbtreeClass.includeModule(runtime.getEnumerable());
         rbtreeClass.setMarshal(RBTREE_MARSHAL);
-        rbtreeClass.defineAnnotatedMethods(RedBlackTree.class);
+        rbtreeClass.defineAnnotatedMethods(MultiRBTree.class);
         return rbtreeClass;
     }
 
     private static final ObjectAllocator RBTREE_ALLOCATOR = new ObjectAllocator() {
         public IRubyObject allocate(Ruby runtime, RubyClass klazz) {
-            return new RedBlackTree(runtime, klazz);
+            return new MultiRBTree(runtime, klazz);
         }
     };
 
-    public RedBlackTree(final Ruby ruby, RubyClass rubyClass) {
+    public MultiRBTree(final Ruby ruby, RubyClass rubyClass) {
         super(ruby, rubyClass);
-        this.dupes = getMetaClass().getRealClass().getName().equals("RedBlackTree");
+        this.dupes = getMetaClass().getRealClass().getName().equals("MultiRBTree");
+        this.ifNone = ruby.getNil();
     }
     
     @JRubyMethod(name = "initialize", optional = 1)
@@ -88,18 +91,18 @@ public class RedBlackTree extends RubyObject {
     public static IRubyObject create(final ThreadContext context, IRubyObject recv, IRubyObject[] args, Block block) {
         RubyClass klass = (RubyClass) recv;
         Ruby runtime = context.getRuntime();
-        final RedBlackTree rbtree;
+        final MultiRBTree rbtree;
         if (args.length == 1) {
-            if (klass.getName().equals("RBTree") && args[0].getMetaClass().getRealClass().getName().equals("RedBlackTree")) 
+            if (klass.getName().equals("RBTree") && args[0].getMetaClass().getRealClass().getName().equals("MultiRBTree")) 
                 throw runtime.newTypeError("cannot convert MultiRBTree to RBTree");
-            if (args[0] instanceof RedBlackTree) {
-                rbtree = (RedBlackTree) klass.allocate();
-                rbtree.update(context, (RedBlackTree) args[0], Block.NULL_BLOCK);
+            if (args[0] instanceof MultiRBTree) {
+                rbtree = (MultiRBTree) klass.allocate();
+                rbtree.update(context, (MultiRBTree) args[0], Block.NULL_BLOCK);
                 return rbtree;
             }
             IRubyObject tmp = TypeConverter.convertToTypeWithCheck(args[0], runtime.getHash(), "to_hash");
             if (!tmp.isNil()) {
-                rbtree = (RedBlackTree) klass.allocate();
+                rbtree = (MultiRBTree) klass.allocate();
                 RubyHash hash = (RubyHash) tmp;
                 hash.visitAll(new RubyHash.Visitor() {
                     @Override
@@ -111,7 +114,7 @@ public class RedBlackTree extends RubyObject {
             }
             tmp = TypeConverter.convertToTypeWithCheck(args[0], runtime.getArray(), "to_ary");
             if (!tmp.isNil()) {
-                rbtree = (RedBlackTree) klass.allocate();
+                rbtree = (MultiRBTree) klass.allocate();
                 RubyArray arr = (RubyArray) tmp;
                 for (int i = 0, j = arr.getLength(); i < j; i++) {
                     IRubyObject v = TypeConverter.convertToTypeWithCheck(arr.entry(i), runtime.getArray(), "to_ary");
@@ -130,7 +133,7 @@ public class RedBlackTree extends RubyObject {
             }
         }
         if (args.length % 2 != 0) throw runtime.newArgumentError("odd number of arguments");
-        rbtree = (RedBlackTree) klass.allocate();
+        rbtree = (MultiRBTree) klass.allocate();
         for (int i = 0; i < args.length; i += 2) {
             rbtree.internalPut(context, args[i], args[i+1], false);
         } 
@@ -216,9 +219,9 @@ public class RedBlackTree extends RubyObject {
     }
 
     private void checkCompatible(Ruby runtime, IRubyObject other) {
-        if (!(other instanceof RedBlackTree))
-            throw runtime.newTypeError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "RedBlackTree"));
-        if (getMetaClass().getRealClass().getName().equals("RBTree") && other.getMetaClass().getRealClass().getName().equals("RedBlackTree")) 
+        if (!(other instanceof MultiRBTree))
+            throw runtime.newTypeError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "MultiRBTree"));
+        if (getMetaClass().getRealClass().getName().equals("RBTree") && other.getMetaClass().getRealClass().getName().equals("MultiRBTree")) 
             throw runtime.newTypeError("cannot convert MultiRBTree to RBTree");
     }
 
@@ -226,7 +229,7 @@ public class RedBlackTree extends RubyObject {
     public IRubyObject update(ThreadContext context, IRubyObject other, Block block) {
         Ruby runtime = getRuntime();
         checkCompatible(runtime, other);
-        RedBlackTree otherTree = (RedBlackTree) other;
+        MultiRBTree otherTree = (MultiRBTree) other;
         for (Node node = otherTree.minimum(); !node.isNull(); node = otherTree.successor(node)) {
             if (block.isGiven()) {
                 op_aset(context, node.getKey(), block.yieldSpecific(context, node.getKey(), op_aref(context, node.getKey()), node.getValue()));
@@ -241,12 +244,12 @@ public class RedBlackTree extends RubyObject {
     public IRubyObject merge(final ThreadContext context, final IRubyObject other) {
         Ruby runtime = getRuntime();
         // TODO should allow RubyHash
-        if (!(other instanceof RedBlackTree)) {
-            runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "RedBlackTree"));
+        if (!(other instanceof MultiRBTree)) {
+            runtime.newArgumentError(String.format("wrong argument type %s (expected %s)", other.getMetaClass().getRealClass().getName(), "MultiRBTree"));
         }
 
-        RedBlackTree result = (RedBlackTree) dup();
-        RedBlackTree otherTree = (RedBlackTree) other;
+        MultiRBTree result = (MultiRBTree) dup();
+        MultiRBTree otherTree = (MultiRBTree) other;
         for (Node node = otherTree.minimum(); !node.isNull(); node = otherTree.successor(node)) {
             result.op_aset(context, node.getKey(), node.getValue());
         }
@@ -301,7 +304,7 @@ public class RedBlackTree extends RubyObject {
     @JRubyMethod(name = "to_hash")
     public IRubyObject to_hash() {
         Ruby runtime = getRuntime();
-        if (getMetaClass().getRealClass().getName().equals("RedBlackTree"))
+        if (getMetaClass().getRealClass().getName().equals("MultiRBTree"))
             throw runtime.newTypeError("cannot convert MultiRBTree to Hash");
         final RubyHash hash = new RubyHash(runtime, runtime.getHash());
         hash.default_value_set(ifNone);
@@ -335,7 +338,7 @@ public class RedBlackTree extends RubyObject {
                 throw getRuntime().newTypeError(String.format("wrong argument type %s (expected %s)", args[0].getMetaClass().getRealClass().getName(), "Proc"));
             }
         }
-        RedBlackTree self = (RedBlackTree) this.dup();
+        MultiRBTree self = (MultiRBTree) this.dup();
         try {
             replaceInternal(context, self, cmpfunc);
         } catch (RaiseException e) {
@@ -378,11 +381,11 @@ public class RedBlackTree extends RubyObject {
         return this.cmpProc;
     }
 
-    public RedBlackTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value) {
+    public MultiRBTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value) {
         return internalPut(context, key, value, true);
     }
 
-    public RedBlackTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value, boolean checkExisting) {
+    public MultiRBTree internalPut(ThreadContext context, IRubyObject key, IRubyObject value, boolean checkExisting) {
         if (!dupes && checkExisting) {
             Node node = internalGet(context, (RubyObject) key); 
             if (node != null) {
@@ -482,6 +485,7 @@ public class RedBlackTree extends RubyObject {
         return x;
     }
 
+    // this is wrong, it cannot grant walk all nodes..
     private Node successor(Node x) {
         if (!x.getRight().isNull()) return minimum(x.getRight());
         Node y = x.getParent();
@@ -513,7 +517,7 @@ public class RedBlackTree extends RubyObject {
         return block.isGiven() ? each_keyCommon(context, block) : enumeratorize(context.runtime, this, "each_key");
     }
 
-    public RedBlackTree each_keyCommon(final ThreadContext context, final Block block) {
+    public MultiRBTree each_keyCommon(final ThreadContext context, final Block block) {
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject val) {
                 block.yield(context, key);
@@ -527,7 +531,7 @@ public class RedBlackTree extends RubyObject {
         return block.isGiven() ? each_valueCommon(context, block) : enumeratorize(context.runtime, this, "each_value");
     }
 
-    public RedBlackTree each_valueCommon(final ThreadContext context, final Block block) {
+    public MultiRBTree each_valueCommon(final ThreadContext context, final Block block) {
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject val) {
                 block.yield(context, val);
@@ -574,14 +578,21 @@ public class RedBlackTree extends RubyObject {
     }
 
     private IRubyObject delete_ifInternal(final ThreadContext context, final Block block) {
-        final RedBlackTree self = this;
-        iteratorVisitAll(new Visitor() {
-            public void visit(IRubyObject key, IRubyObject val) {
-                if (block.yieldSpecific(context, key, val).isTrue()) {
-                    self.delete(context, key, Block.NULL_BLOCK);
+        List<Node> nodeList = new ArrayList<Node>();
+        try {
+            iteratorEntry();
+            for (Node x = minimum(); !x.isNull(); x = successor(x)) {
+                if (block.yieldSpecific(context, x.getKey(), x.getValue()).isTrue()) {
+                    nodeList.add(x);
                 }
             }
-        });
+            // delete backward
+            for (int i = nodeList.size() - 1; i >= 0; i--) {
+                internalDelete(context, nodeList.get(i));
+            }
+        } finally {
+            iteratorExit();
+        }
         return this;
     }
 
@@ -603,7 +614,7 @@ public class RedBlackTree extends RubyObject {
     }
 
     private IRubyObject rejectInternal(ThreadContext context, Block block) {
-        return ((RedBlackTree) dup()).reject_bangInternal(context, block);
+        return ((MultiRBTree) dup()).reject_bangInternal(context, block);
     }
 
     @JRubyMethod
@@ -611,7 +622,7 @@ public class RedBlackTree extends RubyObject {
         final Ruby runtime = getRuntime();
         if (!block.isGiven()) return enumeratorize(runtime, this, "select");
 
-        final RedBlackTree rbtree = (RedBlackTree) getMetaClass().getRealClass().allocate();
+        final MultiRBTree rbtree = (MultiRBTree) getMetaClass().getRealClass().allocate();
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
                 if (block.yieldSpecific(context, key, value).isTrue())
@@ -651,7 +662,7 @@ public class RedBlackTree extends RubyObject {
 
     @JRubyMethod
     public IRubyObject invert(final ThreadContext context) {
-        final RedBlackTree rbtree = (RedBlackTree) getMetaClass().getRealClass().allocate();
+        final MultiRBTree rbtree = (MultiRBTree) getMetaClass().getRealClass().allocate();
         iteratorVisitAll(new Visitor() {
             public void visit(IRubyObject key, IRubyObject value) {
                 rbtree.internalPut(context, value, key);
@@ -848,16 +859,6 @@ public class RedBlackTree extends RubyObject {
         x.setBlack();
     }
 
-    // TODO demo method
-    @JRubyMethod
-    public RubyString get(ThreadContext context) {
-        return RubyString.newString(getRuntime(), "test");
-    }
-    
-    public Node getRoot() {
-        return this.root;
-    }
-
     @JRubyMethod(name = "size")
     public IRubyObject getSize() {
         return getRuntime().newFixnum(this.size);
@@ -958,11 +959,11 @@ public class RedBlackTree extends RubyObject {
     @JRubyMethod(name = {"replace", "initialize_copy"})
     public IRubyObject replace(final ThreadContext context, IRubyObject other) {
         checkCompatible(context.runtime, other);
-        RedBlackTree otherTree = (RedBlackTree) other;
+        MultiRBTree otherTree = (MultiRBTree) other;
         return replaceInternal(context, otherTree, otherTree.cmpProc);
     }
 
-    private IRubyObject replaceInternal(final ThreadContext context, RedBlackTree otherTree, RubyProc cmpfunc) {
+    private IRubyObject replaceInternal(final ThreadContext context, MultiRBTree otherTree, RubyProc cmpfunc) {
         init();
         if (this == otherTree) return this;
         this.ifNone = otherTree.ifNone;
@@ -981,12 +982,12 @@ public class RedBlackTree extends RubyObject {
         Ruby runtime = getRuntime();
         if (this == other)
             return runtime.getTrue();
-        if (!(other instanceof RedBlackTree)) 
+        if (!(other instanceof MultiRBTree)) 
             return runtime.getFalse();
-        return this.dict_eq((RedBlackTree) other) ? runtime.getTrue() : runtime.getFalse();
+        return this.dict_eq((MultiRBTree) other) ? runtime.getTrue() : runtime.getFalse();
     }
 
-    private boolean dict_eq(RedBlackTree other) {
+    private boolean dict_eq(MultiRBTree other) {
         if (this.size != other.size || ! similar(other))
             return false;
         for (Node node1 = minimum(), node2 = other.minimum();
@@ -999,17 +1000,15 @@ public class RedBlackTree extends RubyObject {
         return true;
     }
 
-    private boolean similar(RedBlackTree other) {
+    private boolean similar(MultiRBTree other) {
         return this.cmpProc == other.cmpProc;
     }
 
-    private byte[] comma_breakable(ThreadContext context, IRubyObject pp) {
-        //if (pp == null) 
-        return new byte[]{','};
-        //return ((RubyString) RuntimeHelpers.invoke(context, pp, "comma_breakable")).getBytes();
+    private byte comma_breakable(ThreadContext context, IRubyObject pp) {
+        return (byte) ',';
     }
 
-    private IRubyObject inspectRedBlackTree(final ThreadContext context, final IRubyObject pp) {
+    private IRubyObject inspectMultiRBTree(final ThreadContext context, final IRubyObject pp) {
         final RubyString str = RubyString.newStringLight(context.runtime, DEFAULT_INSPECT_STR_SIZE);
         str.cat(new byte[]{'#', '<'}).cat(getMetaClass().getRealClass().getName().getBytes()).cat(": {".getBytes());
         final boolean[] firstEntry = new boolean[1];
@@ -1053,18 +1052,13 @@ public class RedBlackTree extends RubyObject {
         return str;
     }
 
-    //@JRubyMethod(name = "pretty_print")
-    //public IRubyObject pretty_print(ThreadContext context, IRubyObject pp) {
-    //    return inspectRedBlackTree(context, pp);
-    //}
-
     @JRubyMethod(name = "inspect")
     public IRubyObject inspect(ThreadContext context) {
         if (getRuntime().isInspecting(this)) return getRuntime().newString("#<RBTree: ...>");
 
         try {
             getRuntime().registerInspecting(this);
-            return inspectRedBlackTree(context, null);
+            return inspectMultiRBTree(context, null);
         } finally {
             getRuntime().unregisterInspecting(this);
         }
@@ -1132,7 +1126,7 @@ public class RedBlackTree extends RubyObject {
 
     private static final ObjectMarshal RBTREE_MARSHAL = new ObjectMarshal() {
         public void marshalTo(Ruby runtime, final Object obj, RubyClass recv, final MarshalStream output) throws IOException {
-            RedBlackTree rbtree = (RedBlackTree) obj;
+            MultiRBTree rbtree = (MultiRBTree) obj;
             if (rbtree.size == 0) throw runtime.newArgumentError("cannot dump empty tree");
             if (rbtree.cmpProc != null) throw runtime.newArgumentError("cannot dump rbtree with compare proc");
             output.registerLinkTarget(rbtree);
@@ -1155,7 +1149,7 @@ public class RedBlackTree extends RubyObject {
         }
 
         public Object unmarshalFrom(Ruby runtime, RubyClass type, UnmarshalStream input) throws IOException {
-            RedBlackTree result = (RedBlackTree) type.allocate();
+            MultiRBTree result = (MultiRBTree) type.allocate();
             input.registerLinkTarget(result);
             int size = input.unmarshalInt();
             for (int i = 0; i < size; i++) {

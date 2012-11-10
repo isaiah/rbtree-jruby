@@ -39,8 +39,6 @@ Rake::TestTask.new(:test) do |test|
   test.pattern = 'test/**/test_*.rb'
   test.verbose = true
 end
-desc "Run all tests"
-task :test => :jar
 
 require 'rcov/rcovtask'
 Rcov::RcovTask.new do |test|
@@ -69,7 +67,7 @@ directory "pkg/classes"
 desc "Clean up build artifacts"
 task :clean do
   rm_rf "pkg/classes"
-  rm_rf "lib/rbtree/ext/red_black_tree.jar"
+  rm_rf "lib/rbtree/ext/*.jar"
 end
 
 desc "Compile the extension"
@@ -81,7 +79,7 @@ end
 
 desc "Build the jar"
 task :jar => [:clean, :compile] do
-  ant.jar :basedir => "pkg/classes", :destfile => "lib/rbtree/ext/red_black_tree.jar", :includes => "**/*.class"
+  ant.jar :basedir => "pkg/classes", :destfile => "lib/rbtree/ext/multi_r_b_tree.jar", :includes => "**/*.class"
 end
  
 task :package => :jar

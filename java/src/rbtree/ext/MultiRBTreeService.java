@@ -5,9 +5,9 @@ import org.jruby.runtime.load.BasicLibraryService;
 
 import java.io.IOException;
 
-public class RedBlackTreeService implements BasicLibraryService {
+public class MultiRBTreeService implements BasicLibraryService {
     public boolean basicLoad(final Ruby ruby) throws IOException {
-        RedBlackTree.createRedBlackTreeClass(ruby);
+        MultiRBTree.createMultiRBTreeClass(ruby);
         return true;
     }
 }

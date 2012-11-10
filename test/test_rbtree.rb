@@ -122,7 +122,6 @@ class RBTreeTest < Test::Unit::TestCase
     
     rbtree = RBTree.new { "e" }
     clone = rbtree.clone
-    # FIXME fail
     assert_equal("e", clone.default(nil))
     
     rbtree = RBTree.new
@@ -376,19 +375,16 @@ class RBTreeTest < Test::Unit::TestCase
     assert_raises(ArgumentError) {
       @rbtree.delete_if {|key, val| key == "c" or raise ArgumentError }
     }
-    # let's be consistent with Hash
-    #assert_equal(2, @rbtree.size)
-    assert_equal(1, @rbtree.size)
+    assert_equal(2, @rbtree.size)
     
     assert_raises(RuntimeError) {
       @rbtree.delete_if { @rbtree["e"] = "E" }
     }
-    # see line 381
-    assert_equal(1, @rbtree.size)
+    assert_equal(2, @rbtree.size)
 
     @rbtree.delete_if {
       @rbtree.each {
-        assert_equal(1, @rbtree.size)
+        assert_equal(2, @rbtree.size)
       }
       assert_raises(RuntimeError) {
         @rbtree["e"] = "E"
@@ -732,20 +728,20 @@ class RBTreeTest < Test::Unit::TestCase
       rbtree.readjust {|a, b| a <=> b }
       expected = <<EOS
 #<RBTree: {"a"=>"b",
-  "c"=>"d",
-  "e"=>"f",
-  "g"=>"h",
-  "i"=>"j",
-  "k"=>"l",
-  "m"=>"n",
-  "o"=>"p",
-  "q"=>"r",
-  "s"=>"t",
-  "u"=>"v",
-  "w"=>"x",
-  "y"=>"z"},
- default="a",
- cmp_proc=#{rbtree.cmp_proc}>
+ "c"=>"d",
+ "e"=>"f",
+ "g"=>"h",
+ "i"=>"j",
+ "k"=>"l",
+ "m"=>"n",
+ "o"=>"p",
+ "q"=>"r",
+ "s"=>"t",
+ "u"=>"v",
+ "w"=>"x",
+ "y"=>"z"},
+default="a",
+cmp_proc=#{rbtree.cmp_proc}>
 EOS
       assert_equal(expected, PP.pp(rbtree, ""))
 
@@ -754,8 +750,8 @@ EOS
       rbtree.default = rbtree
       expected = <<EOS
 #<RBTree: {"#<RBTree: ...>"=>"#<RBTree: ...>"},
- default="#<RBTree: ...>",
- cmp_proc=nil>
+default="#<RBTree: ...>",
+cmp_proc=nil>
 EOS
       assert_equal(expected, PP.pp(rbtree, ""))
     end
@@ -764,17 +760,17 @@ EOS
 end
 
 
-class RedBlackTreeTest < Test::Unit::TestCase
+class MultiRBTreeTest < Test::Unit::TestCase
   def setup
-    @rbtree = RedBlackTree[*%w(a A b B b C b D c C)]
+    @rbtree = MultiRBTree[*%w(a A b B b C b D c C)]
   end
 
   def test_create
     assert_equal(%w(a A b B b C b D c C), @rbtree.to_a.flatten)
     
-    assert_equal(RedBlackTree[*%w(a A)], RedBlackTree[RBTree[*%w(a A)]])
+    assert_equal(MultiRBTree[*%w(a A)], MultiRBTree[RBTree[*%w(a A)]])
     assert_raises(TypeError) {
-      RBTree[RedBlackTree[*%w(a A)]]
+      RBTree[MultiRBTree[*%w(a A)]]
     }
   end
 
@@ -829,24 +825,24 @@ class RedBlackTreeTest < Test::Unit::TestCase
   end
 
   def test_equal
-    assert_equal(true, RedBlackTree[*%w(a A b B b C b D c C)] == @rbtree)
-    assert_equal(true, RBTree[*%w(a A)] == RedBlackTree[*%w(a A)])
-    assert_equal(true, RedBlackTree[*%w(a A)] == RBTree[*%w(a A)])
+    assert_equal(true, MultiRBTree[*%w(a A b B b C b D c C)] == @rbtree)
+    assert_equal(true, RBTree[*%w(a A)] == MultiRBTree[*%w(a A)])
+    assert_equal(true, MultiRBTree[*%w(a A)] == RBTree[*%w(a A)])
   end
   
   def test_replace
     assert_equal(RBTree[*%w(a A)],
-                 RedBlackTree[*%w(a A)].replace(RBTree[*%w(a A)]))
+                 MultiRBTree[*%w(a A)].replace(RBTree[*%w(a A)]))
     assert_raises(TypeError) {
-      RBTree[*%w(a A)].replace(RedBlackTree[*%w(a A)])
+      RBTree[*%w(a A)].replace(MultiRBTree[*%w(a A)])
     }
   end
 
   def test_update
-    assert_equal(RedBlackTree[*%w(a A b B)],
-                 RedBlackTree[*%w(a A)].update(RBTree[*%w(b B)]))
+    assert_equal(MultiRBTree[*%w(a A b B)],
+                 MultiRBTree[*%w(a A)].update(RBTree[*%w(b B)]))
     assert_raises(TypeError) {
-      RBTree[*%w(a A)].update(RedBlackTree[*%w(b B)])
+      RBTree[*%w(a A)].update(MultiRBTree[*%w(b B)])
     }
   end
 
@@ -882,7 +878,7 @@ class RedBlackTreeTest < Test::Unit::TestCase
   end
 
   def test_inspect
-    assert_equal(%(#<RedBlackTree: {"a"=>"A", "b"=>"B", "b"=>"C", "b"=>"D", "c"=>"C"}, default=nil, cmp_proc=nil>),
+    assert_equal(%(#<MultiRBTree: {"a"=>"A", "b"=>"B", "b"=>"C", "b"=>"D", "c"=>"C"}, default=nil, cmp_proc=nil>),
                  @rbtree.inspect)
   end
 
@@ -947,7 +943,7 @@ class RedBlackTreeTest < Test::Unit::TestCase
   end
 
   def test_invert
-    assert_equal(RedBlackTree[*%w(A a B b C b C c D b)], @rbtree.invert)
+    assert_equal(MultiRBTree[*%w(A a B b C b C c D b)], @rbtree.invert)
   end
 
   def test_keys
