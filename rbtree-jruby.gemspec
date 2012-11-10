@@ -35,6 +35,7 @@ Gem::Specification.new do |s|
     "lib/rbtree/ext/multi_red_black_tree.jar",
     "lib/rbtree/ext/rbtree.jar",
     "lib/rbtree/ext/red_black_tree.jar",
+    "rbtree-jruby.gemspec",
     "test/helper.rb",
     "test/test_rbtree.rb"
   ]
