@@ -25,9 +25,9 @@ Jeweler::Tasks.new do |gem|
   gem.name = "rbtree-jruby"
   gem.homepage = "http://github.com/isaiah/rbtree-jruby"
   gem.license = "MIT"
-  gem.summary = %Q{Red Black tree java extension}
-  gem.description = %Q{TODO: longer description of your gem}
-  gem.email = "isaiah.peng@vcint.com"
+  gem.summary = %Q{RBTree for jruby}
+  gem.description = %Q{RBTree is a sorted associative collection that is implemented with Red-Black Tree. The elements of RBTree are ordered and its interface is the almost same as Hash, so simply you can consider RBTree sorted Hash.}
+  gem.email = "issaria@gmail.com"
   gem.authors = ["Isaiah Peng"]
   # dependencies defined in Gemfile
 end
