@@ -5,6 +5,19 @@ This is a native implementation of RBTree for jruby.
 
 RBTree is a sorted associative collection that is implemented with Red-Black Tree. The elements of RBTree are ordered and its interface is the almost same as Hash, so simply you can consider RBTree sorted Hash.
 
+Usage
+-------------
+```ruby
+irb(main):001:0> require 'rbtree'
+=> true
+irb(main):002:0> a = RBTree[*%w[a A b B d D c C]]
+=> #<RBTree: {"a"=>"A", "b"=>"B", "c"=>"C", "d"=>"D"}, default=nil, cmp_proc=nil>
+irb(main):003:0> a.keys
+=> ["a", "b", "c", "d"]
+irb(main):004:0> a.values
+=> ["A", "B", "C", "D"]
+```
+
 Contributing to rbtree-jruby
 ----------------------------
  
