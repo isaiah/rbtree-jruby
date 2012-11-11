@@ -55,6 +55,12 @@ duplications of keys but MultiRBTree does.
   end                        # => ["a", 20] ["a", 40] ["c", 10]
 ```
 
+Benchmarks
+-----------
+
+Benchmark takes from headius' [redblack](https://github.com/headius/redblack) project.
+Compared to [rbtree-pure](https://github.com/pwnall/rbtree-pure).
+![benchmark result](https://raw.github.com/isaiah/rbtree-jruby/master/benchmark/result.png)
 
 Requirement
 -----------
