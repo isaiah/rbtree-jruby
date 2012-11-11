@@ -63,7 +63,7 @@ Compared to [rbtree-pure](https://github.com/pwnall/rbtree-pure) and
 [rbtree c extension](https://github.com/skade/rbtree).
 ![benchmark result](https://raw.github.com/isaiah/rbtree-jruby/master/benchmark/result.png)
 
-It's interesting to see jruby with invokedynamic almost get C extension speed, and
+It's interesting to see jruby with invokedynamic almost gets C extension speed, and
 jruby native extension is even faster than it's counterpart.
 For more details, checkout [benchmark directory](https://github.com/isaiah/rbtree-jruby/tree/master/benchmark).
 
