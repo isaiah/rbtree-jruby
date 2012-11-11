@@ -59,8 +59,11 @@ Benchmarks
 -----------
 
 Benchmark takes from headius' [redblack](https://github.com/headius/redblack) project.
-Compared to [rbtree-pure](https://github.com/pwnall/rbtree-pure).
+Compared to [rbtree-pure](https://github.com/pwnall/rbtree-pure) and
+[rbtree c extention](https://github.com/skade/rbtree).
 ![benchmark result](https://raw.github.com/isaiah/rbtree-jruby/master/benchmark/result.png)
+
+For details, checkout [benchmark directory](https://github.com/isaiah/rbtree-jruby/tree/master/benchmark).
 
 Requirement
 -----------
