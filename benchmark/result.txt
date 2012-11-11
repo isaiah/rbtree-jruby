@@ -44,6 +44,32 @@ jruby 1.7.0 (1.9.3p203) 2012-10-22 ff1ebbe on Java HotSpot(TM) 64-Bit Server VM 
 1.658
 1.706
 
+<<<<<<< HEAD
+$ ruby -v && ruby -Xcompile.invokedynamic=true bm1.rb 20
+jruby 1.7.0 (1.9.3p203) 2012-10-22 ff1ebbe on Java HotSpot(TM) 64-Bit Server VM 1.7.0_09-b05 [linux-amd64]
+4.489
+2.282
+1.76
+0.984
+0.928
+1.123
+0.988
+0.998
+0.915
+0.973
+0.981
+0.955
+0.95
+0.946
+0.979
+0.964
+0.955
+1.151
+1.142
+1.092
+
+=======
+>>>>>>> 7d333e6ad5d0c50b9037f415daa35cf960eb86b1
 $ ruby -v && ruby bm1.rb 20
 ruby 1.9.3p327 (2012-11-10 revision 37606) [x86_64-linux]
 0.719245967
