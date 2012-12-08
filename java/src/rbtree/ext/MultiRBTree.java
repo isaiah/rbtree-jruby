@@ -143,7 +143,7 @@ public class MultiRBTree extends RubyObject {
   @JRubyMethod(name = "[]", required = 1)
   public IRubyObject op_aref(ThreadContext context, IRubyObject key) {
     Node node = internalGet(context, (RubyObject) key);
-    return node == null ? callMethod(context, "default", key) : node.getValue();
+    return node == null ? callMethod(context, "default", key) : node.value;
   }
 
   @JRubyMethod(name = "[]=", required = 2, compat = RUBY1_8)
@@ -195,7 +195,7 @@ public class MultiRBTree extends RubyObject {
     }
     Node node = internalGet(context, (RubyObject) args[0]);
     if (node != null)
-      return node.getValue();
+      return node.value;
     if (block.isGiven())
       return block.yield(context, args[0]);
     if (args.length == 1)
@@ -233,9 +233,9 @@ public class MultiRBTree extends RubyObject {
     MultiRBTree otherTree = (MultiRBTree) other;
     for (Node node = otherTree.minimum(); !node.isNull(); node = otherTree.successor(node)) {
       if (block.isGiven()) {
-        op_aset(context, node.getKey(), block.yieldSpecific(context, node.getKey(), op_aref(context, node.getKey()), node.getValue()));
+        op_aset(context, node.key, block.yieldSpecific(context, node.key, op_aref(context, node.key), node.value));
       } else {
-        op_aset(context, node.getKey(), node.getValue());
+        op_aset(context, node.key, node.value);
       }
     }
     return this;
@@ -252,7 +252,7 @@ public class MultiRBTree extends RubyObject {
     MultiRBTree result = (MultiRBTree) dup();
     MultiRBTree otherTree = (MultiRBTree) other;
     for (Node node = otherTree.minimum(); !node.isNull(); node = otherTree.successor(node)) {
-      result.op_aset(context, node.getKey(), node.getValue());
+      result.op_aset(context, node.key, node.value);
     }
     return result;
   }
@@ -398,38 +398,38 @@ public class MultiRBTree extends RubyObject {
 
     Node x = new Node((RubyObject) key, value);
     internalPutHelper(context, x);
-    while (x != this.root && x.getParent().getColor() == Color.RED) {
-      if (x.getParent() == x.getParent().getParent().getLeft()) {
-        Node y = x.getParent().getParent().getRight();
-        if (!y.isNull() && y.color == Color.RED) {
-          x.getParent().setColor(Color.BLACK);
-          y.setColor(Color.BLACK);
-          x.getParent().getParent().setColor(Color.RED);
-          x = x.getParent().getParent();
+    while (x != this.root && x.parent.isRed()) {
+      if (x.parent == x.parent.parent.left) {
+        Node y = x.parent.parent.right;
+        if (!y.isNull() && y.isRed()) {
+          x.parent.setBlack();
+          y.setBlack();
+          x.parent.parent.setRed();
+          x = x.parent.parent;
         } else {
-          if (x == x.getParent().getRight()) {
-            x = x.getParent();
+          if (x.isRight()) {
+            x = x.parent;
             leftRotate(x);
           }
-          x.getParent().setColor(Color.BLACK);
-          x.getParent().getParent().setColor(Color.RED);
-          rightRotate(x.getParent().getParent());
+          x.parent.setBlack();
+          x.parent.parent.setRed();
+          rightRotate(x.parent.parent);
         }
       } else {
-        Node y = x.getParent().getParent().getLeft();
+        Node y = x.parent.parent.left;
         if (!y.isNull() && y.isRed()) {
-          x.getParent().setBlack();
+          x.parent.setBlack();
           y.setBlack();
-          x.getParent().getParent().setRed();
-          x = x.getParent().getParent();
+          x.parent.parent.setRed();
+          x = x.parent.parent;
         } else {
-          if (x == x.getParent().getLeft()) {
-            x = x.getParent();
+          if (x.isLeft()) {
+            x = x.parent;
             rightRotate(x);
           }
-          x.getParent().setBlack();
-          x.getParent().getParent().setRed();
-          leftRotate(x.getParent().getParent());
+          x.parent.setBlack();
+          x.parent.parent.setRed();
+          leftRotate(x.parent.parent);
         }
       }
     }
@@ -438,21 +438,21 @@ public class MultiRBTree extends RubyObject {
   }
 
   public IRubyObject internalDelete(ThreadContext context, Node z) {
-    Node y = (z.getLeft().isNull() || z.getRight().isNull()) ? z : successor(z);
-    Node x = y.getLeft().isNull() ? y.getRight() : y.getLeft();
-    x.setParent(y.getParent());
-    if (y.getParent().isNull()) {
+    Node y = (z.left.isNull() || z.right.isNull()) ? z : successor(z);
+    Node x = y.left.isNull() ? y.right : y.left;
+    x.parent = y.parent;
+    if (y.parent.isNull()) {
       this.root = x;
     } else {
-      if (y == y.getParent().getLeft()) {
-        y.getParent().setLeft(x);
+      if (y.isLeft()) {
+        y.parent.left = x;
       } else {
-        y.getParent().setRight(x);
+        y.parent.right = x;
       }
     }
     if (y != z) {
-      z.setKey(y.getKey());
-      z.setValue(y.getValue());
+      z.setKey(y.key);
+      z.setValue(y.value);
     }
     if (y.isBlack()) deleteFixup(x);
     this.size -= 1;
@@ -468,8 +468,8 @@ public class MultiRBTree extends RubyObject {
   }
 
   private Node minimum(Node x) {
-    while (!x.getLeft().isNull()) {
-      x = x.getLeft();
+    while (!x.left.isNull()) {
+      x = x.left;
     }
     return x;
   }
@@ -482,28 +482,28 @@ public class MultiRBTree extends RubyObject {
   }
 
   private Node maximum(Node x) {
-    while (!x.getRight().isNull())
-      x = x.getRight();
+    while (!x.right.isNull())
+      x = x.right;
     return x;
   }
 
   // this is wrong, it cannot grant walk all nodes..
   private Node successor(Node x) {
-    if (!x.getRight().isNull()) return minimum(x.getRight());
-    Node y = x.getParent();
-    while (!y.isNull() && x == y.getRight()) {
+    if (!x.right.isNull()) return minimum(x.right);
+    Node y = x.parent;
+    while (!y.isNull() && x == y.right) {
       x = y;
-      y = y.getParent();
+      y = y.parent;
     }
     return y;
   }
 
   private Node predecessor(Node x) {
-    if (!x.getLeft().isNull()) return maximum(x.getLeft());
-    Node y = x.getParent();
-    while (!y.isNull() && x == y.getLeft()) {
+    if (!x.left.isNull()) return maximum(x.left);
+    Node y = x.parent;
+    while (!y.isNull() && x == y.left) {
       x = y;
-      y = y.getParent();
+      y = y.parent;
     }
     return y;
   }
@@ -571,7 +571,7 @@ public class MultiRBTree extends RubyObject {
       return getRuntime().getNil();
     }
     internalDelete(context, node);
-    return node.getValue();
+    return node.value;
   }
 
   @JRubyMethod
@@ -584,7 +584,7 @@ public class MultiRBTree extends RubyObject {
     try {
       iteratorEntry();
       for (Node x = minimum(); !x.isNull(); x = successor(x)) {
-        if (block.yieldSpecific(context, x.getKey(), x.getValue()).isTrue()) {
+        if (block.yieldSpecific(context, x.key, x.value).isTrue()) {
           nodeList.add(x);
         }
       }
@@ -708,11 +708,11 @@ public class MultiRBTree extends RubyObject {
   public Node internalGet(ThreadContext context, RubyObject key) {
     Node x = this.root;
     while (!x.isNull()) {
-      int ret = compare(context, key, x.getKey());
+      int ret = compare(context, key, x.key);
       if (ret > 0) {
-        x = x.getRight();
+        x = x.right;
       } else if (ret < 0) {
-        x = x.getLeft();
+        x = x.left;
       } else {
         return x;
       }
@@ -730,55 +730,54 @@ public class MultiRBTree extends RubyObject {
     Node x = this.root;
     int height = 0;
     while (!x.isNull()) {
-      x = x.getLeft();
+      x = x.left;
       if (x.isNull() || x.isBlack()) height += 1;
     }
     return RubyFixnum.newFixnum(getRuntime(), height);
   }
 
   private void leftRotate(Node x) {
-    Node y = x.getRight();
-    x.setRight(y.getLeft());
+    Node y = x.right;
+    x.right = y.left;
 
-    if (!y.getLeft().isNull()) {
-      y.getLeft().setParent(x);
+    if (!y.left.isNull()) {
+      y.left.parent = x;
     }
-    y.setParent(x.getParent());
-    if (x.getParent().isNull()) {
+    y.parent = x.parent;
+    if (x.parent.isNull()) {
       this.root = y;
     } else {
-      if (x == x.getParent().getLeft()) {
-        x.getParent().setLeft(y);
-      } else {
-        x.getParent().setRight(y);
-      }
+      if (x.isLeft()) {
+        x.parent.left = y;
+      } else
+        x.parent.right = y;
     }
-    y.setLeft(x);
-    x.setParent(y);
+    y.left = x;
+    x.parent = y;
   }
 
   private void rightRotate(Node x) {
-    Node y = x.getLeft();
-    x.setLeft(y.getRight());
-    if (!y.getRight().isNull()) {
-      y.getRight().setParent(x);
+    Node y = x.left;
+    x.left = y.right;
+    if (!y.right.isNull()) {
+      y.right.parent = x;
     }
-    y.setParent(x.getParent());
-    if (x.getParent().isNull()) {
+    y.parent = x.parent;
+    if (x.parent.isNull()) {
       this.root = y;
     } else {
-      if (x == x.getParent().getLeft()) {
-        x.getParent().setLeft(y);
+      if (x.isLeft()) {
+        x.parent.left = y;
       } else {
-        x.getParent().setRight(y);
+        x.parent.right = y;
       }
     }
-    y.setRight(x);
-    x.setParent(y);
+    y.right = x;
+    x.parent = y;
   }
 
   private int compare(ThreadContext context, Node a, Node b) {
-    return compare(context, a.getKey(), b.getKey());
+    return compare(context, a.key, b.key);
   }
 
   private int compare(ThreadContext context, RubyObject a, RubyObject b) {
@@ -792,16 +791,16 @@ public class MultiRBTree extends RubyObject {
     Node x = this.root;
     while (!x.isNull()) {
       y = x;
-      x = compare(context, z, x) < 0 ? x.getLeft() : x.getRight();
+      x = compare(context, z, x) < 0 ? x.left : x.right;
     }
-    z.setParent(y);
+    z.parent = y;
     if (y.isNull()) {
       this.root = z;
     } else {
       if (compare(context, z, y) < 0) {
-        y.setLeft(z);
+        y.left = z;
       } else {
-        y.setRight(z);
+        y.right = z;
       }
     }
     this.size += 1;
@@ -810,51 +809,51 @@ public class MultiRBTree extends RubyObject {
   private void deleteFixup(Node x) {
     while (x != this.root && x.isBlack()) {
       if (x.isLeft()) {
-        Node w = x.getParent().getRight();
+        Node w = x.parent.right;
         if (w.isRed()) {
           w.setBlack();
-          x.getParent().setRed();
-          leftRotate(x.getParent());
-          w = x.getParent().getRight();
+          x.parent.setRed();
+          leftRotate(x.parent);
+          w = x.parent.right;
         }
-        if (w.getLeft().isBlack() && w.getRight().isBlack()) {
+        if (w.left.isBlack() && w.right.isBlack()) {
           w.setRed();
-          x = x.getParent();
+          x = x.parent;
         } else {
-          if (w.getRight().isBlack()) {
-            w.getLeft().setBlack();
+          if (w.right.isBlack()) {
+            w.left.setBlack();
             w.setRed();
             rightRotate(w);
-            w = x.getParent().getRight();
+            w = x.parent.right;
           }
-          w.setColor(x.getParent().getColor());
-          x.getParent().setBlack();
-          w.getRight().setBlack();
-          leftRotate(x.getParent());
+          w.color = x.parent.color;
+          x.parent.setBlack();
+          w.right.setBlack();
+          leftRotate(x.parent);
           x = this.root;
         }
       } else {
-        Node w = x.getParent().getLeft();
+        Node w = x.parent.left;
         if (w.isRed()) {
           w.setBlack();
-          x.getParent().setRed();
-          rightRotate(x.getParent());
-          w = x.getParent().getLeft();
+          x.parent.setRed();
+          rightRotate(x.parent);
+          w = x.parent.left;
         }
-        if (w.getRight().isBlack() && w.getLeft().isBlack()) {
+        if (w.right.isBlack() && w.left.isBlack()) {
           w.setRed();
-          x = x.getParent();
+          x = x.parent;
         } else {
-          if (w.getLeft().isBlack()) {
-            w.getRight().setBlack();
+          if (w.left.isBlack()) {
+            w.right.setBlack();
             w.setRed();
             rightRotate(w);
-            w = x.getParent().getLeft();
+            w = x.parent.left;
           }
-          w.setColor(x.getParent().getColor());
-          x.getParent().setBlack();
-          w.getLeft().setBlack();
-          rightRotate(x.getParent());
+          w.color = x.parent.color;
+          x.parent.setBlack();
+          w.left.setBlack();
+          rightRotate(x.parent);
           x = this.root;
         }
       }
@@ -882,18 +881,18 @@ public class MultiRBTree extends RubyObject {
     Node node = this.root;
     Node tentative = NilNode.getInstance();
     while (!node.isNull()) {
-      int result = compare(context, (RubyObject) key, node.getKey());
+      int result = compare(context, (RubyObject) key, node.key);
       if (result > 0) {
-        node = node.getRight();
+        node = node.right;
       } else if (result < 0) {
         tentative = node;
-        node = node.getLeft();
+        node = node.left;
       } else {
         if (!dupes) {
           return node;
         } else {
           tentative = node;
-          node = node.getLeft();
+          node = node.left;
         }
       }
     }
@@ -911,18 +910,18 @@ public class MultiRBTree extends RubyObject {
     Node node = this.root;
     Node tentative = NilNode.getInstance();
     while (!node.isNull()) {
-      int result = compare(context, (RubyObject) key, node.getKey());
+      int result = compare(context, (RubyObject) key, node.key);
       if (result < 0) {
-        node = node.getLeft();
+        node = node.left;
       } else if (result > 0) {
         tentative = node;
-        node = node.getRight();
+        node = node.right;
       } else {
         if (!dupes) {
           return node;
         } else { // if there are duplicates, go to the far right
           tentative = node;
-          node = node.getRight();
+          node = node.right;
         }
       }
     }
@@ -956,7 +955,7 @@ public class MultiRBTree extends RubyObject {
   }
 
   private RubyArray newArray(Node node) {
-    return getRuntime().newArray(node.getKey(), node.getValue());
+    return getRuntime().newArray(node.key, node.value);
   }
 
   @JRubyMethod(name = {"replace", "initialize_copy"})
@@ -1019,7 +1018,6 @@ public class MultiRBTree extends RubyObject {
     final boolean is19 = context.runtime.is1_9();
     visitAll(new Visitor() {
       public void visit(IRubyObject key, IRubyObject value) {
-        //if (!firstEntry[0]) str.cat((byte)',').cat((byte)' ');
         if (!firstEntry[0]) str.cat(comma_breakable(context, pp)).cat((byte) ' ');
 
         RubyString inspectedKey = inspect(context, key);
@@ -1096,7 +1094,7 @@ public class MultiRBTree extends RubyObject {
 
   private void visitAll(Visitor visitor) {
     for (Node x = minimum(); !x.isNull(); x = successor(x)) {
-      visitor.visit(x.getKey(), x.getValue());
+      visitor.visit(x.key, x.value);
     }
   }
 
@@ -1104,7 +1102,7 @@ public class MultiRBTree extends RubyObject {
     try {
       iteratorEntry();
       for (Node x = maximum(); !x.isNull(); x = predecessor(x)) {
-        visitor.visit(x.getKey(), x.getValue());
+        visitor.visit(x.key, x.value);
       }
     } finally {
       iteratorExit();
@@ -1115,7 +1113,7 @@ public class MultiRBTree extends RubyObject {
     try {
       iteratorEntry();
       for (Node x = minimum(); !x.isNull(); x = successor(x)) {
-        visitor.visit(x.getKey(), x.getValue());
+        visitor.visit(x.key, x.value);
       }
     } finally {
       iteratorExit();
@@ -1216,48 +1214,8 @@ public class MultiRBTree extends RubyObject {
       return !isRed();
     }
 
-    public RubyObject getKey() {
-      return this.key;
-    }
-
-    public IRubyObject getValue() {
-      return this.value;
-    }
-
-    public Node getLeft() {
-      return this.left;
-    }
-
-    public Node getRight() {
-      return this.right;
-    }
-
-    public Node getParent() {
-      return this.parent;
-    }
-
     public Node getGrandParent() {
-      return this.parent.getParent();
-    }
-
-    public Color getColor() {
-      return this.color;
-    }
-
-    public void setLeft(Node node) {
-      this.left = node;
-    }
-
-    public void setRight(Node node) {
-      this.right = node;
-    }
-
-    public void setParent(Node node) {
-      this.parent = node;
-    }
-
-    public void setColor(Color color) {
-      this.color = color;
+      return this.parent.parent;
     }
 
     public void setKey(IRubyObject key) {
