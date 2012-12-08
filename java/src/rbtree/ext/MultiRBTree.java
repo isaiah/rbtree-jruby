@@ -1147,7 +1147,6 @@ public class MultiRBTree extends RubyObject {
       } catch (VisitorIOException e) {
         throw (IOException) e.getCause();
       }
-      //if (!rbtree.ifNone != null) output.dumpObject(rbtree.ifNone);
     }
 
     public Object unmarshalFrom(Ruby runtime, RubyClass type, UnmarshalStream input) throws IOException {
@@ -1157,7 +1156,6 @@ public class MultiRBTree extends RubyObject {
       for (int i = 0; i < size; i++) {
         result.internalPut(runtime.getCurrentContext(), input.unmarshalObject(), input.unmarshalObject());
       }
-      //if (defaultValue) result.default_value_set(input.unmarshalObject());
       return result;
     }
   };
@@ -1184,7 +1182,7 @@ public class MultiRBTree extends RubyObject {
     }
   }
 
-  public static class Node {
+  private static class Node {
     protected Color color;
     protected RubyObject key;
     protected IRubyObject value;
@@ -1252,7 +1250,7 @@ public class MultiRBTree extends RubyObject {
   }
 
 
-  public static class NilNode extends Node {
+  private static class NilNode extends Node {
       private static NilNode nil = null;
       private NilNode() {
           this.color = Color.BLACK;
@@ -1271,5 +1269,5 @@ public class MultiRBTree extends RubyObject {
           return true;
       }
   }
-  public enum Color { RED, BLACK }
+  private enum Color { RED, BLACK }
 }
