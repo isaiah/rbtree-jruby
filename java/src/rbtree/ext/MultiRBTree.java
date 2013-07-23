@@ -563,8 +563,8 @@ public class MultiRBTree extends RubyObject {
 
   @JRubyMethod
   public IRubyObject delete(ThreadContext context, IRubyObject key, Block block) {
-    Node node = lower_boundInternal(context, key);
-    if (node.isNull()) {
+    Node node = internalGet(context, (RubyObject) key);
+    if (node == null) {
       if (block.isGiven()) {
         return block.yield(context, key);
       }

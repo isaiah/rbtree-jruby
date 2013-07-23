@@ -959,4 +959,21 @@ class MultiRBTreeTest < Test::Unit::TestCase
     assert_equal("b", @rbtree.index("C"))
     assert_equal("b", @rbtree.index("D"))
   end
+
+end
+
+class RegressionTest < Test::Unit::TestCase
+  def setup
+    @number_key_tree = RBTree.new
+    @number_key_tree[5]  = 'a'
+    @number_key_tree[15] = 'b'
+    @number_key_tree[10] = 'c'
+  end
+
+  # gh #1
+  def test_number_key_delete
+    assert_equal(false, @number_key_tree.include?(7))
+    assert_nil(@number_key_tree.delete(7))
+    assert_equal(3, @number_key_tree.size)
+  end
 end
