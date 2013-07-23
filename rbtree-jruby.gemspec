@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "rbtree-jruby"
-  s.version = "0.1.0"
+  s.version = "0.1.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Isaiah Peng"]
-  s.date = "2012-11-10"
+  s.date = "2013-07-23"
   s.description = "RBTree is a sorted associative collection that is implemented with Red-Black Tree. The elements of RBTree are ordered and its interface is the almost same as Hash, so simply you can consider RBTree sorted Hash."
   s.email = "issaria@gmail.com"
   s.extra_rdoc_files = [
@@ -25,16 +25,14 @@ Gem::Specification.new do |s|
     "README.md",
     "Rakefile",
     "VERSION",
-    "java/src/rbtree/ext/Color.java",
+    "benchmark/bm.rb",
+    "benchmark/bm1.rb",
+    "benchmark/result.png",
+    "benchmark/result.txt",
     "java/src/rbtree/ext/MultiRBTree.java",
     "java/src/rbtree/ext/MultiRBTreeService.java",
-    "java/src/rbtree/ext/NilNode.java",
-    "java/src/rbtree/ext/Node.java",
     "lib/rbtree.rb",
     "lib/rbtree/ext/multi_r_b_tree.jar",
-    "lib/rbtree/ext/multi_red_black_tree.jar",
-    "lib/rbtree/ext/rbtree.jar",
-    "lib/rbtree/ext/red_black_tree.jar",
     "rbtree-jruby.gemspec",
     "test/helper.rb",
     "test/test_rbtree.rb"
